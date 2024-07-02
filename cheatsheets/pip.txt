@@ -1,0 +1,39 @@
+# PIP Cheatsheet
+
+## Basic Commands
+- Install a package:
+  ```
+  pip install package_name
+  ```
+
+- Uninstall a package:
+  ```
+  pip uninstall package_name
+  ```
+
+- List installed packages:
+  ```
+  pip list
+  ```
+
+- Show details about a package:
+  ```
+  pip show package_name
+  ```
+
+- Upgrade a package:
+  ```
+  pip install --upgrade package_name
+  ```
+
+- Freeze installed packages:
+  ```
+  pip freeze > requirements.txt
+  ```
+
+- Install from requirements file:
+  ```
+  pip install -r requirements.txt
+
+
+  
