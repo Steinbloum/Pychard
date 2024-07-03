@@ -1,5 +1,12 @@
 import random
 import pandas as pd
+from dataclasses import dataclass
+import time
+from faker import Faker
+import itertools
+
+fake=Faker()
+
 
 #Voici un petit script de demo je vais pas tout commenter, tu pourras balancer à gpt.
 # je développe les étapes quand même
@@ -84,6 +91,7 @@ class Battle:
         self.warrior_2 = warrior_2
         self.crit_value = 3
         self.historique = []
+        self.printer = True
 
     def round(self, attacker:Personnage, defendant:Personnage):
 
@@ -100,11 +108,12 @@ class Battle:
 
         if defendant.element == attacker.nemesis:
             nb_des_attaque += 1
-            nb_faces_attaque += 1
+            nb_faces_attaque -= 1
 
         if defendant.nemesis == attacker.element:
 
-            nb_faces_defense += 1
+            nb_faces_defense -= 1
+            nb_des_defense +=1
 
         #On lance les dés grâce à la classe Dice créée plus haut :
 
@@ -120,10 +129,14 @@ class Battle:
 
         if defendant.pv <= 0 : #si le défenseur se retrouve muerto
             defendant.is_alive = False # on met en False son attribut is_alive
+            if self.printer:
+                Printer.printDead(defendant)
+            return False
 
         #on retourne toutes les infos de ce round sous forme de dictionnaire
         return {"attacker" : attacker.nom, 
                 "defendant" : defendant.nom, 
+                "final_damage":valeur_degats,
                 "attacker_hp" : attacker.pv,
                 "defendant_hp" : defendant.pv,
                 "total_attack":attack_roll.total(),
@@ -140,25 +153,102 @@ class Battle:
         warriors = [self.warrior_1, self.warrior_2] #je crée une liste avec mes objets
         match_history = []
         round_counter = 0
-        while all([warrior.is_alive for warrior in warriors]): #a chaque début de loop on va vérifier que l'attribut is_alive de nos warriors est True
+        everybodyLives = lambda : all([warrior.is_alive for warrior in warriors])
+        st = time.time()
+
+        while everybodyLives(): #a chaque début de loop on va vérifier que l'attribut is_alive de nos warriors est True
             round_result = self.round(self.warrior_1, self.warrior_2)
-            if round_result:#si personne n'est mort
-                # on rajoute le résultat à l'historique (une liste)
-                match_history.append(dict(round_result, round=round_counter))
-            else:
-                continue #si qqun est mort on va sortir de la boucle. on pourrait break aussi ça serait similaire
-            
-            #idem mais on écnahge l'attaquant et le defenseur
+            if not everybodyLives():
+                break
+            if self.printer:
+                Printer.printAttackResult(round_result) #on affiche le résultat du round grâce à notre self.printer
+                Printer.printDefenseResult(round_result) #on affiche le résultat du round grâce à notre self.printer
+            # on rajoute le résultat à l'historique (une liste)
+            match_history.append(dict(round_result, round=round_counter))
+
+           #idem mais on écnahge l'attaquant et le defenseur
             round_result = self.round(self.warrior_2, self.warrior_1)
             if round_result:#si personne n'est mort
-                # on rajoute le résultat à l'historique (une liste)
+                if not everybodyLives():
+                    break
+                if self.printer:
+                    Printer.printAttackResult(round_result)
+                    Printer.printDefenseResult(round_result) #on affiche le résultat du round grâce à notre self.printer
                 match_history.append(dict(round_result, round=round_counter))
 
-            else:
-                continue 
             round_counter +=1
-        # print(pd.DataFrame.from_records(match_history))
+        
+        if self.printer:
+            Printer.printMatchStats(match_history, time.time()-st) 
         return match_history
+
+
+class Tournoi:
+    def __init__(self, nombre_de_warriors = 100) -> None:
+        self.warriors_nb = nombre_de_warriors
+        self.warriors = []
+
+    def createWarriors(self):
+        for n in range(self.warriors_nb):
+            warrior = random.choice([WaterWarrior, AirWarrior, FireWarrior, DirtWarrior])(fake.name())
+            self.warriors.append(warrior)
+        print([f"{x.nom}, {x.element}" for x in self.warriors])
+
+    def TournoiAPoints(self):
+        matches = list(itertools.combinations(self.warriors,2))
+        for i,match in enumerate(matches):
+            match[0].pv = 1000
+            match[1].pv = 1000
+            battle = Battle(match[0], match[1])
+            battle.printer = False
+            recs = battle.deathmatch()
+            # print(pd.DataFrame.from_records(recs))
+
+
+
+
+
+
+
+
+
+
+@dataclass
+class Printer:
+
+
+    def printAttackResult(round):
+        print(f"{round['attacker']} attaque pour {round['total_attack']}")
+    
+    def printDefenseResult(round):
+        print(f"{round['defendant']} pare {round['total_defense']} dégâts\n")
+
+
+    def printDead(warrior):
+
+        print("\nXxXxXxX")
+        print(f"{warrior.nom} s'est battu avec courage, mais il est mort. Dommage")
+        print("XxXxXxX\n")
+
+    def printMatchStats(match_history, chrono=False):
+        df = pd.DataFrame.from_records(match_history)
+        nombre_de_rounds = df['round'].iloc[-1]
+        attaque_de_ouf = max(df['total_attack'])
+        parade_de_ouf = max(df['total_defense'])
+
+        print("\nXxXxXxX")
+        print(f"Il aura fallu {nombre_de_rounds} rounds pour départager les guerriers")
+        print(f"L'attaque la plus puissante a causé {attaque_de_ouf} dégats.")
+        print(f"La meilleure parade a esquivé {parade_de_ouf} dégâts.")
+        
+        if chrono:
+            print(f"Le match a duré {round(chrono, 4)} secondes")
+        print("XxXxXxX\n")
+        
+        print(df)
+
+
+""" SCRIPT """
 
 
             
@@ -167,17 +257,14 @@ fireboy = FireWarrior('Fireboy')
 waterboy = WaterWarrior("Waterboy")
 airboy = AirWarrior('Airboy')
 
-ba = Battle(fireboy, airboy)
-recs = ba.deathmatch()
-df = pd.DataFrame.from_records(recs)
-print(df)
-print(df[(df['round'] == 0)
-         &
-         (df['defendant'] == 'Airboy')
-         ])
-
-# # print(df.groupby("attacker").agg({"max":"total_attack", "mean":"total_attack"}))
-# print(df.describe())
+# ba = Battle(fireboy, airboy)
+# ba.printer = False
+# recs = ba.deathmatch()
+# df = pd.DataFrame.from_records(recs)
+# print(df)
+tn = Tournoi()
+tn.createWarriors()
+tn.TournoiAPoints()
         
 
 

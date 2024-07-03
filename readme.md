@@ -10,7 +10,7 @@ Autant prendre tout de suite les bonnes habitudes!
     Rien de plus simple avec la commande pip dans le terminal : 
     pip install *bibli*
     par exemple pip install pandas. 
-    Tu trouveras d'ailleurs un lien vers la commande d'install dans la doc de ladite lib. 
+    Tu trouveras d'ailleurs un lien vers la commande d'install dans les docs des libs
     par exemple pandas encore : https://pandas.pydata.org/docs/getting_started/install.html (tu remarqueras l'inspiration pour la doc de copilot)
 
 * en général dans un projet python tu trouveras à la root du dossier un fichier qui s'appelle requirements.txt.

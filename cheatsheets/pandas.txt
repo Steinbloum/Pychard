@@ -1,0 +1,34 @@
+# Pandas Cheatsheet
+
+## Basic Operations
+```python
+import pandas as pd
+
+# Create a DataFrame
+data = {'Name': ['Alice', 'Bob', 'Charlie'], 'Age': [25, 30, 35]}
+df = pd.DataFrame(data)
+
+# Display first few rows
+print(df.head())
+
+# Select a column
+ages = df['Age']
+
+# Filter rows
+filtered_df = df[df['Age'] > 25]
+
+# Add a new column
+df['City'] = ['New York', 'Los Angeles', 'Chicago']
+
+# Drop a column
+df = df.drop('City', axis=1)
+
+# Group by and aggregate
+grouped_df = df.groupby('Age').mean()
+
+# Read from a CSV file
+df = pd.read_csv('data.csv')
+
+# Write to a CSV file
+df.to_csv('output.csv', index=False)
+```
