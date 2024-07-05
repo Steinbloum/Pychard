@@ -1,5 +1,17 @@
 **Hello Richard**
 
+Instal rapide : 
+*clone ce repository
+*execute set_venv
+*execute run_console
+*execute les fichiers.py
+
+
+
+
+
+
+
 Bienvenue dans ce tutoriel personalisé d'installation d'un environement propre pour pythoniser !
 ---
 
