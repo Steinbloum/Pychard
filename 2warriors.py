@@ -254,10 +254,10 @@ class Printer:
 
 
     def printAttackResult(round):
-        print(f"{round['attacker']} attaque pour {round['total_attack']}")
+        print(f"{round['attacker_obj'].nom} attaque pour {round['total_attack']}")
     
     def printDefenseResult(round):
-        print(f"{round['defendant']} pare {round['total_defense']} dégâts\n")
+        print(f"{round['defendant_obj'].nom} pare {round['total_defense']} dégâts\n")
 
     def printDead(warrior):
 
@@ -280,7 +280,7 @@ class Printer:
             print(f"Le match a duré {round(chrono, 4)} secondes")
         print("XxXxXxX\n")
         
-        print(df)
+        # print(df)
     def PointTournamentStart(warriors, matchs):
 
         print("\nXxXxXxX\n")
@@ -318,7 +318,7 @@ class Printer:
         gr = details.groupby('defendant_name').sum(['total_damage']).reset_index()
         top_def_warrior = gr.sort_values(by='total_defense').iloc[0]['defendant_name']
         top_def_value = gr.sort_values(by='total_defense').iloc[0]['total_defense']
-        print(f"Meilleure défense : {top_def_warrior} avec {Printer.bigNumber(top_def_value)} dégâts parés")
+        print(f"Meilleure défense : {top_def_warrior} avec {Printer.bigNumber(top_def_value)} dégâts esquivés")
 
 
 
@@ -337,16 +337,22 @@ class Printer:
 
 """ SCRIPT """
 
-# fireboy = FireWarrior('Fireboy')
-# waterboy = WaterWarrior("Waterboy")
-# airboy = AirWarrior('Airboy')
+
+""" COMBAT UNITAIRE """
+
+fireboy = FireWarrior('Richard')
+airboy = AirWarrior('Oscar')
 
 # ba = Battle(fireboy, airboy)
-# ba.printer = False
-# recs = ba.deathmatch()
+# ba.printer = True
+# ba.deathmatch()
 # df = pd.DataFrame.from_records(recs)
 # print(df)
-tn = Tournoi(10)
+
+""" TOURNOI A POINTS """
+
+
+tn = Tournoi(40)
 tn.createWarriors()
 tn.TournoiAPoints()
         
