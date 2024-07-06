@@ -5,6 +5,8 @@ import time
 from faker import Faker
 import itertools
 from icecream import ic
+from tqdm import tqdm
+
 
 fake=Faker()
 ic.configureOutput(includeContext=True)
@@ -27,7 +29,6 @@ class Personnage:
         self.pv = 1000
         self.is_alive=True
 
-
     def takeDamage(self, dmg):
         if dmg > 0:
             self.pv -= dmg
@@ -38,6 +39,7 @@ class Personnage:
     def reset(self):
         self.is_alive=True
         self.pv=1000
+
 #définition des sous-classes
 
 class FireWarrior(Personnage):
@@ -192,7 +194,7 @@ class Battle:
 
 class Tournoi:
     def __init__(self, nombre_de_warriors = 100) -> None:
-        self.warriors_nb = nombre_de_warriors
+        self.warriors_nb = None
         self.warriors = []
         self.scores = {}
 
@@ -203,7 +205,11 @@ class Tournoi:
             self.warriors.append(warrior)
         # print([f"{x.nom}, {x.element}" for x in self.warriors])
 
-    def TournoiAPoints(self):
+    def TournoiAPoints(self,nombre_de_warriors = 100):
+        
+        self.warriors_nb = nombre_de_warriors
+
+        self.createWarriors()
 
         matches = list(itertools.combinations(self.warriors,2)) #génère une liste de combinaisons uniques par 2, donc des matchs[(w1, w2), (w3,w4), etc...]
         print(f"{len(matches)} deathmatchs à disputer")
@@ -212,7 +218,7 @@ class Tournoi:
 
         Printer.PointTournamentStart(self.warriors, matches)
         st = time.time()
-        for i,warriors in enumerate(matches): #pour chacun des matchs créés plus haut :
+        for i,warriors in tqdm(enumerate(matches), desc = "Tournoi cours", unit=" Combats"): #pour chacun des matchs créés plus haut : #tqdm pour afficher la progress bar
 
             warriors[0].reset()# reset des attributs des warriors pour un nouveau match
             warriors[1].reset()
@@ -242,17 +248,10 @@ class Tournoi:
         details = pd.DataFrame.from_records(list(itertools.chain.from_iterable(battle_results)))
         Printer.PointTournamentEnd(chrono, warriors, matches, df, details)
         
-
-
-
-            
-            
-
-
 @dataclass
 class Printer:
 
-
+    """ SINGLE BATTLE """
     def printAttackResult(round):
         print(f"{round['attacker_obj'].nom} attaque pour {round['total_attack']}")
     
@@ -281,6 +280,9 @@ class Printer:
         print("XxXxXxX\n")
         
         # print(df)
+    
+    """ TOURNAMENT """
+    
     def PointTournamentStart(warriors, matchs):
 
         print("\nXxXxXxX\n")
@@ -291,13 +293,10 @@ class Printer:
         print("3\n2\n1\n")
         Printer.starheader("FIGHT")
 
-    def starheader(txt):
-        print(f"\n*-*-*-*-*-*-* {txt} *-*-*-*-*-*-*\n")
-
     def PointTournamentEnd(chrono, warriors, matchs, score, details):
         Printer.starheader("STATS")
         print(f"Durée du tournoi : {round(chrono, 2)} secondes")
-        print(f"Durée moyenne d'un combat : {round(chrono/len(matchs),4)} secondes")
+        print(f"Durée moyenne d'un round : {round(chrono/len(matchs),4)} secondes")
         print()
         df = details
 
@@ -321,7 +320,7 @@ class Printer:
         print(f"Meilleure défense : {top_def_warrior} avec {Printer.bigNumber(top_def_value)} dégâts esquivés")
 
 
-
+    """ MISC """
 
 
     def bigNumber(num):
@@ -333,6 +332,9 @@ class Printer:
             return f"{num / 1_000:.1f}k"
         else:
             return str(num)
+        
+    def starheader(txt):
+        print(f"\n*-*-*-*-*-*-* {txt} *-*-*-*-*-*-*\n")
 
 
 """ SCRIPT """
@@ -350,14 +352,3 @@ airboy = AirWarrior('Oscar')
 # print(df)
 
 """ TOURNOI A POINTS """
-
-
-tn = Tournoi(40)
-tn.createWarriors()
-tn.TournoiAPoints()
-        
-
-
-        
-
-
