@@ -28,6 +28,11 @@ class Personnage:
         self.nom = nom
         self.pv = 1000
         self.is_alive=True
+        self.attack_dices = 3
+        self.attack_faces = 6
+        self.defense_dices = 2
+        self.defense_faces = 8
+
 
     def takeDamage(self, dmg):
         if dmg > 0:
@@ -39,6 +44,16 @@ class Personnage:
     def reset(self):
         self.is_alive=True
         self.pv=1000
+
+    def attack(self):
+        des = Dice(self.attack_faces, self.attack_dices)
+        des.lancer()
+        return des.total()
+    
+    def defend(self):
+        des = Dice(self.defense_faces, self.defense_dices)
+        des.lancer()
+        return des.total()
 
 #définition des sous-classes
 
@@ -102,10 +117,6 @@ class Battle:
         self.printer = True
 
     def round(self, attacker:Personnage, defendant:Personnage):
-
-        # if not attacker.is_alive:
-        #     #en début de round, il est possible quil soit déja mort s'il a combattu avant. 
-        #     return False #on arrete tout se suite la fonction et on retourne False
 
         nb_des_attaque = 4 #nombre de des d'attaque
         nb_faces_attaque = 6 #nbre de faces du dé d'attaque
@@ -193,32 +204,40 @@ class Battle:
         return match_history
 
 class Tournoi:
-    def __init__(self, nombre_de_warriors = 100) -> None:
+    def __init__(self) -> None:
         self.warriors_nb = None
         self.warriors = []
         self.scores = {}
 
 
-    def createWarriors(self):
+    def createBasicWarriors(self):
         for n in range(self.warriors_nb):
             warrior = random.choice([WaterWarrior, AirWarrior, FireWarrior, DirtWarrior])(fake.name())
             self.warriors.append(warrior)
         # print([f"{x.nom}, {x.element}" for x in self.warriors])
 
     def TournoiAPoints(self,nombre_de_warriors = 100):
+        """Dans ce mode, chacun des warriors se bat une fois contre tout le monde.
+        1 point en cas de victoire.
+
+        Args:
+            nombre_de_warriors (int, optional): nb de warrioir. Defaults to 100.
+        """
         
         self.warriors_nb = nombre_de_warriors
 
-        self.createWarriors()
+        self.createBasicWarriors()
 
         matches = list(itertools.combinations(self.warriors,2)) #génère une liste de combinaisons uniques par 2, donc des matchs[(w1, w2), (w3,w4), etc...]
         print(f"{len(matches)} deathmatchs à disputer")
         scores = {warrior:0 for warrior in self.warriors}#génère un dictionnaire {nomduwarrior : 0} et on incremente ici pour garder le score
-        battle_results = []
+        battle_results = [] #crée une liste pour y mettre les résultats
 
         Printer.PointTournamentStart(self.warriors, matches)
+
         st = time.time()
-        for i,warriors in tqdm(enumerate(matches), desc = "Tournoi cours", unit=" Combats"): #pour chacun des matchs créés plus haut : #tqdm pour afficher la progress bar
+        for i,warriors in tqdm(list(
+                            enumerate(matches)), desc = "Tournoi cours", unit=" Combats"): #pour chacun des matchs créés plus haut : #tqdm pour afficher la progress bar
 
             warriors[0].reset()# reset des attributs des warriors pour un nouveau match
             warriors[1].reset()
@@ -248,6 +267,57 @@ class Tournoi:
         details = pd.DataFrame.from_records(list(itertools.chain.from_iterable(battle_results)))
         Printer.PointTournamentEnd(chrono, warriors, matches, df, details)
         
+    def BattleRoyale(self,nombre_de_warriors = 100, show_details=True):
+        self.warriors_nb = nombre_de_warriors
+        self.createBasicWarriors()
+        for warrior in self.warriors:
+            warrior.is_berserk = False
+        self.matches = {} #on crée une liste pour accuiliir les matchs
+        battle_count = 0
+        while len([x for x in self.warriors if x.is_alive])>1:
+            for warrior in self.warriors:
+                ennemy = random.choice([x for x in self.warriors if x!= warrior])#choisi un ennemi au hasard dans la liste ( sauf lui meme)
+                self.matches[warrior]=ennemy
+            df = pd.DataFrame({
+                "attacker":self.matches.keys(), "defendant": self.matches.values()
+            })
+            for warrior in self.warriors:                    
+                    if not warrior.is_alive:
+                        continue
+                    defense = 0
+                    attakdf = df.loc[df.defendant==warrior].reset_index(drop=True)
+
+                    # print(attakdf)
+                    incoming_damage = sum([attacker.attack() for attacker in attakdf.attacker])
+                    if incoming_damage > 0:
+                        battle_count +=1
+                        if warrior.pv<20:
+                            Printer.berserk(warrior.nom)
+                            if not warrior.is_berserk:
+                                warrior.attack_faces += 2
+                                warrior.attack_dices +=1
+                                warrior.defense_faces += 2
+                                warrior.defense_dices +=1
+                                warrior.is_berserk=True
+                            
+
+                        defense = warrior.defend()
+                    warrior.takeDamage(incoming_damage-defense)
+                    if warrior.pv<=0:
+                        warrior.is_alive=False
+                    Printer.battleResults(warrior, attakdf.attacker, incoming_damage, defense, battle_count)
+                    if not warrior.is_alive:
+                        Printer.printDead(warrior)
+        winner = [x.nom for x in self.warriors if x.is_alive][0]
+        print(f"{winner} remporte ce Battle Royale, des légendes et chansons seront écrites sur cet héros !")
+
+                    
+
+
+
+
+        
+
 @dataclass
 class Printer:
 
@@ -318,6 +388,33 @@ class Printer:
         top_def_warrior = gr.sort_values(by='total_defense').iloc[0]['defendant_name']
         top_def_value = gr.sort_values(by='total_defense').iloc[0]['total_defense']
         print(f"Meilleure défense : {top_def_warrior} avec {Printer.bigNumber(top_def_value)} dégâts esquivés")
+
+
+    """ BATTLE ROYALE """
+
+    def battleResults(defendant, attackers, total_damage, total_defense, battle_count):
+        Printer.starheader(f"BATTLE {battle_count} RESULTS")
+        # print(attackers)
+        attackers = attackers.tolist()
+        if len(attackers)==0:
+            print(f"{defendant.nom} passe à travers les mailles du filet !")
+            print(f"Il n'aura pas à se défendre ce tour ci !")
+            return
+        elif len(attackers)==1:
+            print(f"C'est un duel entre {defendant.nom} et {attackers[0].nom}")
+        else :
+            print(f"{defendant.nom} va devoir se défendre contre {', '.join([x.nom for x in attackers[:-1]])} et {attackers[-1].nom}")
+            print()
+            final_damage = total_damage-total_defense
+            if final_damage <=0:
+                print(f"Incroyable défense de {defendant.nom} qui parvient à esquiver les {total_damage} points de dégâts")
+            else:
+                print(f"{', '.join([x.nom for x in attackers[:-1]])} et {attackers[-1].nom} assènent {total_damage} dégats.")
+            print(f"{defendant.nom} réussi à esquiver {total_defense} dégats")
+        print(f"{defendant.nom} termine ce round avec {defendant.pv} pv.")
+
+    def berserk(warrior):
+        print(f"{warrior} IS IN BERSERK MODE !!!")
 
 
     """ MISC """

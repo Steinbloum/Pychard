@@ -5,4 +5,4 @@ from builders import Tournoi
 
 
 tn = Tournoi()
-tn.TournoiAPoints(50)
+tn.TournoiAPoints(200)
