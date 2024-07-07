@@ -6,7 +6,7 @@ from faker import Faker
 import itertools
 from icecream import ic
 from tqdm import tqdm
-
+import plotly.express as px
 
 fake=Faker()
 ic.configureOutput(includeContext=True)
@@ -26,7 +26,7 @@ ic.configureOutput(includeContext=True)
 class Personnage:
     def __init__(self, nom) -> None:
         self.nom = nom
-        self.pv = 1000
+        self.pv = 500
         self.is_alive=True
         self.attack_dices = 3
         self.attack_faces = 6
@@ -212,7 +212,7 @@ class Tournoi:
 
     def createBasicWarriors(self):
         for n in range(self.warriors_nb):
-            warrior = random.choice([WaterWarrior, AirWarrior, FireWarrior, DirtWarrior])(fake.name())
+            warrior = random.choice([WaterWarrior, AirWarrior, FireWarrior, DirtWarrior])(fake.name_male())
             self.warriors.append(warrior)
         # print([f"{x.nom}, {x.element}" for x in self.warriors])
 
@@ -268,48 +268,101 @@ class Tournoi:
         Printer.PointTournamentEnd(chrono, warriors, matches, df, details)
         
     def BattleRoyale(self,nombre_de_warriors = 100, show_details=True):
+
+        """ REGLES : 
+            - A chaque round, chaque warrior se fait assigner un ennemi aléatoirement 
+            - Une fois que tous les ennemeis sont choisis, on prend la liste des défenseurs
+            - Ceux qui n'ont pas été choisis passent leur tour.
+            - Les autres reçoivent les attaques cummulées des assaillants.
+            - Si le défenseur se défend contre 3 ou plus d'assaillants, il gagne un bonus permanent :
+                - +1 face attaque/ennemi >=3 ex : 5 ennemis = +2 faces
+                - +1 dé défense si nombre ennemis >= 5 
+            - Lorsqu'un warrior tombe sous 20pv, on active le mode BERSERK, +1dé et +1face en attque et défense
+            """
+            
+            
+
+
         self.warriors_nb = nombre_de_warriors
         self.createBasicWarriors()
         for warrior in self.warriors:
             warrior.is_berserk = False
         self.matches = {} #on crée une liste pour accuiliir les matchs
         battle_count = 0
-        while len([x for x in self.warriors if x.is_alive])>1:
-            for warrior in self.warriors:
-                ennemy = random.choice([x for x in self.warriors if x!= warrior])#choisi un ennemi au hasard dans la liste ( sauf lui meme)
+        alive_list = lambda x : [w for w in x if w.is_alive]
+        we_have_a_winner = lambda x : len(alive_list(x)) == 1
+        recs = []
+        while not we_have_a_winner(self.warriors):
+            # print(we_have_a_winner(alive_list(self.warriors)))
+            # print(alive_list(self.warriors))
+
+            for warrior in alive_list(self.warriors):
+                ennemy = random.choice([x for x in alive_list(self.warriors) if (x!= warrior)])#choisi un ennemi au hasard dans la liste ( sauf lui meme et les morts)
                 self.matches[warrior]=ennemy
             df = pd.DataFrame({
                 "attacker":self.matches.keys(), "defendant": self.matches.values()
             })
+            convertColtoName = lambda x : x.nom
+            # input(df['defendant'].apply(convertObjtoName))
             for warrior in self.warriors:                    
                     if not warrior.is_alive:
                         continue
                     defense = 0
                     attakdf = df.loc[df.defendant==warrior].reset_index(drop=True)
+                    alive_attackers = alive_list(attakdf.attacker)
+                    if len(alive_attackers) >=3:
+                        warrior.attack_faces += len(alive_attackers)-2
 
-                    # print(attakdf)
-                    incoming_damage = sum([attacker.attack() for attacker in attakdf.attacker])
+                        attakdf['atakname'] = attakdf['attacker'].map(convertColtoName)
+                        attakdf['defendname'] = attakdf['defendant'].map(convertColtoName)
+                        # print(attakdf)
+                        # input(len(attakdf))
+                    if len(alive_attackers) >=5:
+                        warrior.defense_dices += 1
+                    
+                    incoming_damage = sum([attacker.attack() for attacker in alive_attackers])
                     if incoming_damage > 0:
                         battle_count +=1
                         if warrior.pv<20:
-                            Printer.berserk(warrior.nom)
+                            
                             if not warrior.is_berserk:
-                                warrior.attack_faces += 2
-                                warrior.attack_dices +=1
-                                warrior.defense_faces += 2
-                                warrior.defense_dices +=1
+                                warrior.attack_faces += 1
+                                warrior.attack_dices += 1
+                                warrior.defense_faces += 1
+                                warrior.defense_dices += 1
                                 warrior.is_berserk=True
                             
 
                         defense = warrior.defend()
                     warrior.takeDamage(incoming_damage-defense)
+
                     if warrior.pv<=0:
                         warrior.is_alive=False
-                    Printer.battleResults(warrior, attakdf.attacker, incoming_damage, defense, battle_count)
+                    if show_details:
+                        Printer.battleResults(warrior, alive_list(attakdf.attacker), incoming_damage, defense, battle_count)
+                        Printer.berserk(warrior.nom)
                     if not warrior.is_alive:
-                        Printer.printDead(warrior)
-        winner = [x.nom for x in self.warriors if x.is_alive][0]
-        print(f"{winner} remporte ce Battle Royale, des légendes et chansons seront écrites sur cet héros !")
+                        if show_details:
+                            Printer.printDead(warrior)
+                    recs.append(dict(warrior.__dict__, 
+                                     attackers_nb=len(alive_attackers),
+                                     battle = battle_count,
+                                     incoming_damage=incoming_damage))
+                    
+
+        winner = [x.nom for x in self.warriors if x.is_alive]
+        # print(f"{winner} remporte ce Battle Royale, des légendes et chansons seront écrites sur cet héros !")
+        df = pd.DataFrame.from_records(recs)
+        most_powerfull = df.sort_values(by='attack_faces', ascending=False)["nom"].iloc[0]
+        most_protected = df.sort_values(by='defense_dices', ascending=False)["nom"].iloc[0]
+        # print(most_powerfull, most_protected)
+
+        # print(df.loc[df.nom == winner[0]])
+        Printer.global_results(df)
+        fig = px.line(df, y="pv", x="battle", color="nom")
+        fig.show()
+        fig = px.scatter(df, y="attack_faces", x="defense_dices", color="nom")
+        fig.show()
 
                     
 
@@ -395,7 +448,7 @@ class Printer:
     def battleResults(defendant, attackers, total_damage, total_defense, battle_count):
         Printer.starheader(f"BATTLE {battle_count} RESULTS")
         # print(attackers)
-        attackers = attackers.tolist()
+        # attackers = attackers.tolist()
         if len(attackers)==0:
             print(f"{defendant.nom} passe à travers les mailles du filet !")
             print(f"Il n'aura pas à se défendre ce tour ci !")
@@ -416,6 +469,24 @@ class Printer:
     def berserk(warrior):
         print(f"{warrior} IS IN BERSERK MODE !!!")
 
+    def global_results(df):
+        Printer.starheader('RESULTATS DE LA BATTLE ROYALE')
+        Printer.subheader('GAGNANT')
+        winner = df.loc[df.pv>0].iloc[-1]['nom']
+        print(f"{winner} remporte cette bataille !")
+        print("Voici ses stats finales :")
+        stats = df.loc[df.pv>0].iloc[-1].to_dict()
+        for k, v in stats.items():
+            if k in ['nom', 'pv', 'attack_dices', 'attack_faces', 'defense_dices', 'defense_faces']:
+                print(f"== {k.replace('_', ' ').capitalize()} : {v}")
+        max_attackers = max(df.loc[df.nom == winner ].attackers_nb)
+        print(f"== Maximum d'ennemis : {max_attackers}")
+        battle_rate = (len(df.loc[(df.nom == winner)&(df.attackers_nb > 0)])/len(df.loc[(df.nom == winner)]))*100
+        print(f"== Taux de bataille : {battle_rate:.2f}%")
+        total_incoming = sum(df.loc[df.nom == winner].incoming_damage)
+        print(f"== Total de dégats subis : {Printer.bigNumber(total_incoming)}")
+        battle_count = len(df.loc[(df.nom == winner)&(df.attackers_nb > 0)])
+        print(f"== Batailles disputées : {battle_count}")
 
     """ MISC """
 
@@ -433,6 +504,8 @@ class Printer:
     def starheader(txt):
         print(f"\n*-*-*-*-*-*-* {txt} *-*-*-*-*-*-*\n")
 
+    def subheader(txt):
+        print(f"\n== {txt} ==\n")    
 
 """ SCRIPT """
 
