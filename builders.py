@@ -359,10 +359,10 @@ class Tournoi:
 
         # print(df.loc[df.nom == winner[0]])
         Printer.global_results(df)
-        fig = px.line(df, y="pv", x="battle", color="nom")
+        fig = px.line(df.sort_values(by="nom"), y="pv", x="battle", color="nom")
         fig.show()
-        fig = px.scatter(df, y="attack_faces", x="defense_dices", color="nom")
-        fig.show()
+        # fig = px.scatter(df, y="attack_faces", x="defense_dices", color="nom")
+        # fig.show()
 
                     
 
@@ -470,8 +470,9 @@ class Printer:
         print(f"{warrior} IS IN BERSERK MODE !!!")
 
     def global_results(df):
-        Printer.starheader('RESULTATS DE LA BATTLE ROYALE')
-        Printer.subheader('GAGNANT')
+        Printer.starheader('BATTLE TERMINEE')
+        print("\n\n")
+        Printer.starheader('GAGNANT')
         winner = df.loc[df.pv>0].iloc[-1]['nom']
         print(f"{winner} remporte cette bataille !")
         print("Voici ses stats finales :")
@@ -487,6 +488,33 @@ class Printer:
         print(f"== Total de dégats subis : {Printer.bigNumber(total_incoming)}")
         battle_count = len(df.loc[(df.nom == winner)&(df.attackers_nb > 0)])
         print(f"== Batailles disputées : {battle_count}")
+        Printer.starheader('MEDAILLES SPECIALES')
+        df = df.sort_values(by=['incoming_damage', 'attackers_nb'], ascending=[False, False])
+        Printer.subheader("GANGBANG AWARD")
+        print(f"== Attribué à {df.nom.iloc[0]} qui a pris un total de {df.incoming_damage.iloc[0]} dégâts venant de {df.attackers_nb.iloc[0]} assaillants")
+        Printer.subheader("MARTYR AWARD")
+        gr = df.groupby("nom").sum("incoming_damage").reset_index().sort_values(by="is_alive", ascending=False)
+        print(f"== Attribué à {gr.nom.iloc[0]} qui a subi un total de {gr.incoming_damage.iloc[0]} dégâts")
+        Printer.subheader("LUCKY AWARD")
+        gr = df.groupby(["attackers_nb", "nom"]).count().reset_index().sort_values(by=["attackers_nb","pv"], ascending=[True, False])
+        print(f"== Attribué à {gr.nom.iloc[0]} qui a esquivé un total de {gr.pv.iloc[0]} batailles")
+        Printer.subheader("BERSERKER AWARD")
+        gr = df.groupby(["attackers_nb", "nom"]).count().reset_index().sort_values(by="is_berserk", ascending=False)
+        print(f"== Attribué à {gr.nom.iloc[0]} qui a fait {gr.is_berserk.iloc[0]} batailles en mode BERSERK")
+        Printer.subheader("SHIELDER AWARD")
+        df = df.sort_values(by=['defense_dices', 'defense_faces'], ascending=[False, False])
+        print(f"== Attribué à {df.nom.iloc[0]} qui a obtenu {df.defense_dices.iloc[0]} dés {df.defense_faces.iloc[0]} faces.")
+        Printer.subheader("BRUTE AWARD")
+        df = df.sort_values(by=['attack_faces', 'defense_faces'], ascending=False)
+        print(f"== Attribué à {df.nom.iloc[0]} qui a obtenu {df.attack_faces.iloc[0]} faces d'attaque.")
+
+        print(gr)
+
+        
+
+        print(gr)
+
+        print(df)
 
     """ MISC """
 
