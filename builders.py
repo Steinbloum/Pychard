@@ -35,7 +35,7 @@ class Personnage:
 
 
     def takeDamage(self, dmg):
-        if dmg > 0:
+        if dmg>0:
             self.pv -= dmg
 
     def heal(self, points):
@@ -211,10 +211,18 @@ class Tournoi:
 
 
     def createBasicWarriors(self):
-        for n in range(self.warriors_nb):
-            warrior = random.choice([WaterWarrior, AirWarrior, FireWarrior, DirtWarrior])(fake.name_male())
+        ls = []
+        for n in range(self.warriors_nb):#generate random unique names
+            while True:
+                name = fake.name()
+                if name not in ls:
+                    ls.append(name)
+                    break
+
+        for name in ls:#generate the warriors
+        
+            warrior = random.choice([WaterWarrior, AirWarrior, FireWarrior, DirtWarrior])(name)
             self.warriors.append(warrior)
-        # print([f"{x.nom}, {x.element}" for x in self.warriors])
 
     def TournoiAPoints(self,nombre_de_warriors = 100):
         """Dans ce mode, chacun des warriors se bat une fois contre tout le monde.
@@ -292,9 +300,10 @@ class Tournoi:
         alive_list = lambda x : [w for w in x if w.is_alive]
         we_have_a_winner = lambda x : len(alive_list(x)) == 1
         recs = []
+        Printer.starheader("FIGHT")
+        print(f"== COMBATTANTS ENGAGES : {len(self.warriors)}")
+        st = time.time()
         while not we_have_a_winner(self.warriors):
-            # print(we_have_a_winner(alive_list(self.warriors)))
-            # print(alive_list(self.warriors))
 
             for warrior in alive_list(self.warriors):
                 ennemy = random.choice([x for x in alive_list(self.warriors) if (x!= warrior)])#choisi un ennemi au hasard dans la liste ( sauf lui meme et les morts)
@@ -334,7 +343,8 @@ class Tournoi:
                             
 
                         defense = warrior.defend()
-                    warrior.takeDamage(incoming_damage-defense)
+                    if incoming_damage-defense >0:
+                        warrior.takeDamage(incoming_damage-defense)
 
                     if warrior.pv<=0:
                         warrior.is_alive=False
@@ -349,20 +359,14 @@ class Tournoi:
                                      battle = battle_count,
                                      incoming_damage=incoming_damage))
                     
-
-        winner = [x.nom for x in self.warriors if x.is_alive]
-        # print(f"{winner} remporte ce Battle Royale, des légendes et chansons seront écrites sur cet héros !")
         df = pd.DataFrame.from_records(recs)
-        most_powerfull = df.sort_values(by='attack_faces', ascending=False)["nom"].iloc[0]
-        most_protected = df.sort_values(by='defense_dices', ascending=False)["nom"].iloc[0]
-        # print(most_powerfull, most_protected)
+        ti = time.time()-st
+        
+        Printer.global_results(df, ti)
 
-        # print(df.loc[df.nom == winner[0]])
-        Printer.global_results(df)
-        fig = px.line(df.sort_values(by="nom"), y="pv", x="battle", color="nom")
-        fig.show()
-        # fig = px.scatter(df, y="attack_faces", x="defense_dices", color="nom")
-        # fig.show()
+        
+
+
 
                     
 
@@ -469,12 +473,14 @@ class Printer:
     def berserk(warrior):
         print(f"{warrior} IS IN BERSERK MODE !!!")
 
-    def global_results(df):
+    def global_results(df, ti, show_fig=True):
+        Printer.subheader(f"{len(df.nom.unique().tolist()) -1} GUERRIERS DECIMES EN {ti:.2f} SECONDES")
+        if show_fig:
+            fig = px.line(df, x="battle",y="pv", color="nom")
+            fig.show()
         Printer.starheader('BATTLE TERMINEE')
-        print("\n\n")
-        Printer.starheader('GAGNANT')
         winner = df.loc[df.pv>0].iloc[-1]['nom']
-        print(f"{winner} remporte cette bataille !")
+        print(f"{winner} remporte cette battle, il y aura eu {Printer.bigNumber(df.battle.max)} combats !")
         print("Voici ses stats finales :")
         stats = df.loc[df.pv>0].iloc[-1].to_dict()
         for k, v in stats.items():
@@ -489,32 +495,28 @@ class Printer:
         battle_count = len(df.loc[(df.nom == winner)&(df.attackers_nb > 0)])
         print(f"== Batailles disputées : {battle_count}")
         Printer.starheader('MEDAILLES SPECIALES')
-        df = df.sort_values(by=['incoming_damage', 'attackers_nb'], ascending=[False, False])
+        df = df.sort_values(by=['attackers_nb','incoming_damage'], ascending=[False, False])
         Printer.subheader("GANGBANG AWARD")
-        print(f"== Attribué à {df.nom.iloc[0]} qui a pris un total de {df.incoming_damage.iloc[0]} dégâts venant de {df.attackers_nb.iloc[0]} assaillants")
+        print(f"== Attribué à {df.nom.iloc[0]} qui a pris un total de {df.incoming_damage.iloc[0]} dégâts venant de {df.attackers_nb.iloc[0]} assaillants simultanément")
         Printer.subheader("MARTYR AWARD")
-        gr = df.groupby("nom").sum("incoming_damage").reset_index().sort_values(by="is_alive", ascending=False)
-        print(f"== Attribué à {gr.nom.iloc[0]} qui a subi un total de {gr.incoming_damage.iloc[0]} dégâts")
+        df = df.sort_values(by="pv")
+        print(f"== Attribué à {df.nom.iloc[0]} qui a pris un overkill de {df.pv.iloc[0]*-1} dégats ! Ouch")
         Printer.subheader("LUCKY AWARD")
         gr = df.groupby(["attackers_nb", "nom"]).count().reset_index().sort_values(by=["attackers_nb","pv"], ascending=[True, False])
         print(f"== Attribué à {gr.nom.iloc[0]} qui a esquivé un total de {gr.pv.iloc[0]} batailles")
         Printer.subheader("BERSERKER AWARD")
-        gr = df.groupby(["attackers_nb", "nom"]).count().reset_index().sort_values(by="is_berserk", ascending=False)
+        _df = df.loc[(df.is_berserk)&(df.attackers_nb>0)]
+        gr = _df.groupby("nom").count().reset_index().sort_values(by="is_berserk", ascending=False)
         print(f"== Attribué à {gr.nom.iloc[0]} qui a fait {gr.is_berserk.iloc[0]} batailles en mode BERSERK")
         Printer.subheader("SHIELDER AWARD")
         df = df.sort_values(by=['defense_dices', 'defense_faces'], ascending=[False, False])
-        print(f"== Attribué à {df.nom.iloc[0]} qui a obtenu {df.defense_dices.iloc[0]} dés {df.defense_faces.iloc[0]} faces.")
+        print(f"== Attribué à {df.nom.iloc[0]} qui a obtenu {df.defense_dices.iloc[0]} dés {df.defense_faces.iloc[0]} faces de défense.")
         Printer.subheader("BRUTE AWARD")
         df = df.sort_values(by=['attack_faces', 'defense_faces'], ascending=False)
         print(f"== Attribué à {df.nom.iloc[0]} qui a obtenu {df.attack_faces.iloc[0]} faces d'attaque.")
+        Printer.subheader("GLOBAL DATAFRAME")
+        print(df.sort_values(by="battle"))
 
-        print(gr)
-
-        
-
-        print(gr)
-
-        print(df)
 
     """ MISC """
 
